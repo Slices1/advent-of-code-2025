@@ -1,11 +1,11 @@
 use std::fs;
-use std::path::Path;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let file_path = Path::new("inputs/4.txt");
-
-    let content = fs::read_to_string(file_path)?;
+    let content = fs::read_to_string("inputs/4.txt")
+        .or_else(|_| fs::read_to_string("../../inputs/4.txt"))
+        .expect("Could not find input file in either location");    
+    
     let lines: Vec<&str> = content.lines().collect();
 
     // input is grid of 1s and 0s
