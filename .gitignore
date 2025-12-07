@@ -3,3 +3,5 @@ inputs/*
 /london-leaderboard
 /temp
 .*
+/src/bin/day-*
+!/src/bin/day-*.rs

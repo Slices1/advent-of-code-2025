@@ -6,7 +6,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .or_else(|_| fs::read_to_string("../../inputs/5.txt"))
         .expect("Could not find input file in either location");    
 
-    let lines: Vec<&str> = content.lines().collect();
 
     // split at \n\n, first section is ingredient ID ranges, second is ingredient ids
     let split_lines = content.split("\n\n").collect::<Vec<&str>>();
@@ -68,9 +67,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     }
     // print
-    for range in &merged_ranges {
+    // for range in &merged_ranges {
         // println!("Merged Range: {}-{}", range.0, range.1);
-    }
+    // }
 
     // sum
     let mut ids_in_ranges = 0;
