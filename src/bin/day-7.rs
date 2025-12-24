@@ -1,6 +1,5 @@
 use std::fs;
 use std::error::Error;
-extern crate memoise;
 use memoise::memoise;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
