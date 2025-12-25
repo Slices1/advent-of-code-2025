@@ -156,7 +156,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
     ////// PART 2
-    let mut part_2_min_presses: u64 = u64::MAX;
     // try every combination.
     // this time, you can press a single button multiple times.
     // each button press incrememnts a the corresponding joltage counter
@@ -244,7 +243,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // we'll have to use matrices (probably)
 
     // use gaussian elimination
-    part_2_min_presses = solve_gaussian(joltage_required_state.len(), &button_lists, &joltage_required_state);
+    let part_2_min_presses = solve_gaussian(joltage_required_state.len(), &button_lists, &joltage_required_state);
 
     if part_2_min_presses == u64::MAX {
         // Warning only, don't crash

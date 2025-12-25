@@ -1,5 +1,6 @@
 use std::fs;
 use std::error::Error;
+use std::collections::HashSet;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct BitGrid {
@@ -53,8 +54,8 @@ pub struct PrecomputedPlacement {
 }
 
 pub struct SolverContext {
-    // Index = Shape ID. 
-    // Value = All valid BitGrid masks for that shape on this specific board size.
+    // index = shape id. 
+    // value = vec of all valid BitGrid masks for that shape on this specific board size.
     pub placements_by_shape: Vec<Vec<PrecomputedPlacement>>,
     
     // The specific list of pieces we need to fit for this query.
@@ -63,18 +64,97 @@ pub struct SolverContext {
     pub pieces_to_solve: Vec<usize>,
 }
 
-fn can_presents_fit_in_region(present_amounts: Vec<usize>, region_size: (usize, usize), binary_presents: &Vec<Vec<Vec<u8>>>) -> bool {
-  // all presents have convex hull of 3x3
-  // therefore we can immediately accept any situation where all presents fit side by side
-  // presents can't be stacked, so we only care about the x
-  if present_amounts.clone().into_iter().sum::<usize>()*3 <= region_size.0 {
+// generates 8 symmetries for strictly 3x3 shapes
+fn get_variations(grid: &Vec<Vec<u8>>) -> Vec<Vec<(usize, usize)>> {
+    let mut unique = HashSet::new();
+    
+    // extract base coordinates
+    let mut coords: Vec<(usize, usize)> = grid.iter().enumerate()
+        .flat_map(|(row, row_vec)| row_vec.iter().enumerate().filter(|&(_, &v)| v == 1).map(move |(col, _)| (row, col)))
+        .collect();
+    coords.sort(); 
+
+    // generate 8 permutations
+    for _ in 0..4 {
+        unique.insert(coords.clone());
+        
+        // flip horizontal: (row, col) -> (row, 2-col)
+        let mut flipped: Vec<_> = coords.iter().map(|&(row, col)| (row, 2 - col)).collect();
+        flipped.sort();
+        unique.insert(flipped);
+
+        // rotate 90 deg: (row, col) -> (col, 2-row)
+        coords = coords.iter().map(|&(row, col)| (col, 2 - row)).collect();
+        coords.sort();
+    }
+    unique.into_iter().collect()
+}
+
+fn prepare_solver(width: usize, height: usize, grids: &Vec<Vec<Vec<u8>>>, amounts: &[usize]) -> Option<SolverContext> {
+    // expand amounts to list of ids
+    let mut pieces = Vec::with_capacity(amounts.iter().sum());
+    amounts.iter().enumerate().for_each(|(id, &cnt)| (0..cnt).for_each(|_| pieces.push(id)));
+    
+    // sort by number of 1s (area) descending to fail fast
+    pieces.sort_by_key(|&id| std::cmp::Reverse(grids[id].iter().flatten().filter(|&&x| x == 1).count()));
+
+    let mut placements = vec![Vec::new(); grids.len()];
+    
+    // safety check for small regions
+    if width < 3 || height < 3 { return None; }
+
+    // pre-compute masks
+    for &id in &pieces {
+        if !placements[id].is_empty() { continue; }
+
+        let vars = get_variations(&grids[id]);
+        
+        // slide across region
+        for offsets in vars {
+            // since shape is always 3x3, we iterate to size - 3
+            for row in 0..=(height - 3) {
+                for col in 0..=(width - 3) {
+                    let mut mask = BitGrid::new();
+                    // map local 3x3 coords to global bitmask
+                    for &(offset_row, offset_col) in &offsets { 
+                        mask.set_bit(row + offset_row, col + offset_col, width); 
+                    }
+                    placements[id].push(PrecomputedPlacement { mask });
+                }
+            }
+        }
+        if placements[id].is_empty() { return None; }
+    }
+
+    Some(SolverContext { placements_by_shape: placements, pieces_to_solve: pieces })
+}
+
+fn solve_recursive(ctx: &SolverContext, idx: usize, board: BitGrid, last_move_idx: usize) -> bool {
+    if idx == ctx.pieces_to_solve.len() { return true; }
+    
+    let id = ctx.pieces_to_solve[idx];
+    // symmetry breaking
+    let start = if idx > 0 && id == ctx.pieces_to_solve[idx-1] { last_move_idx + 1 } else { 0 };
+
+    for (i, p) in ctx.placements_by_shape[id].iter().enumerate().skip(start) {
+        if !board.overlaps(&p.mask) {
+            if solve_recursive(ctx, idx + 1, board.merge(&p.mask), i) { return true; }
+        }
+    }
+    false
+}
+
+fn can_presents_fit_in_region(amounts: Vec<usize>, size: (usize, usize), grids: &Vec<Vec<Vec<u8>>>) -> bool {
+  let (w, h) = size;
+  let num_presents = amounts.clone().iter().sum::<usize>();
+
+  if num_presents*3 <= w {
     return true;
   } 
    
   // we can also perform a check to see if the total area of presents exceeds the area available
-  let num_presents = present_amounts.clone().iter().sum::<usize>();
   let total_volume_of_presents = num_presents*7; // all presents have 7 units of area and 2 units of air
-  if total_volume_of_presents > region_size.0 * region_size.1 {
+  if total_volume_of_presents > w*h {
     return false;
   }
 
@@ -113,7 +193,7 @@ fn can_presents_fit_in_region(present_amounts: Vec<usize>, region_size: (usize, 
   // adding their binary arrays together and checking for any values > 1 and breaking early if it happens
 
   // initialise region
-  let region: Vec<Vec<u8>> = vec![vec![0; region_size.0]; region_size.1];
+  // let region: Vec<Vec<u8>> = vec![vec![0; region_size.0]; region_size.1];
   
 
   // for present_num in 0.. {
@@ -168,7 +248,11 @@ fn can_presents_fit_in_region(present_amounts: Vec<usize>, region_size: (usize, 
   // which is easilt doable
 
 
-  false
+  // prepare and solve
+  match prepare_solver(size.0, size.1, grids, &amounts) {
+        Some(ctx) => solve_recursive(&ctx, 0, BitGrid::new(), 0),
+        None => false
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

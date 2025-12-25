@@ -9,19 +9,19 @@ enum Cell {
     Splitter, // '^'
 }
 
-fn print_grid(grid: &Vec<Vec<Cell>>) {
-        for row in grid.iter() {
-        for cell in row.iter() {
-            // print!("{}", sym);
-            print!("{}", match cell {
-                Cell::Beam => 'S',
-                Cell::Empty => '.',
-                Cell::Splitter => '^',
-            });
-        }
-        println!("");
-    }
-}
+// fn print_grid(grid: &Vec<Vec<Cell>>) {
+//         for row in grid.iter() {
+//         for cell in row.iter() {
+//             // print!("{}", sym);
+//             print!("{}", match cell {
+//                 Cell::Beam => 'S',
+//                 Cell::Empty => '.',
+//                 Cell::Splitter => '^',
+//             });
+//         }
+//         println!("");
+//     }
+// }
 
 #[memoise(row <= 143, col <= 143)]
 fn timelines(grid: &Vec<Vec<Cell>>, row: usize, col: usize) -> u64 {
